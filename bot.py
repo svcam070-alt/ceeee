@@ -22,7 +22,7 @@ from database import (
     set_ad, get_ad, remove_ad, increment_ad_count,
     get_active_mandatory_subs, is_user_completed_sub, mark_user_completed_sub,
     add_mandatory_subscription, remove_mandatory_subscription, list_mandatory_subscriptions,
-    set_user_completed_sub, get_user_referral_count
+    set_user_completed_sub
 )
 
 load_dotenv()
@@ -40,7 +40,6 @@ if not RENDER_EXTERNAL_HOSTNAME:
     raise ValueError("RENDER_EXTERNAL_HOSTNAME topilmadi")
 WEBHOOK_URL = f"https://{RENDER_EXTERNAL_HOSTNAME}{WEBHOOK_PATH}"
 
-# ======================== Bot sozlamalari ========================
 
 # ======================== Reklama ========================
 async def send_ad(bot, chat_id):
@@ -306,11 +305,9 @@ async def start_after_subs(update: Update, context: CallbackContext):
         message = update.message
 
     await message.reply_text(
-        f"🎬 Kino botiga xush kelibsiz!\n"
-        f"📣 Kino kanalimiz: {CHANNEL_USERNAME}\n\n"
+        f"🎬 Kino botiga xush kelibsiz!\n\n"
         f"Film kodini raqamlarda yuboring.\n"
-        f"Admin: /admin\n\n"
-        f"🔗 /referral - referal havolangiz va statistikangiz"
+        f"Admin: /admin"
     )
     asyncio.create_task(send_ad(context.bot, user_id))
 
@@ -327,33 +324,6 @@ async def start(update: Update, context: CallbackContext):
     await start_after_subs(update, context)
 
 
-# ======================== Referal (foydalanuvchi uchun) ========================
-async def referral(update: Update, context: CallbackContext):
-    """Foydalanuvchi o'zining referal havolasini va statistikasini ko'radi"""
-    user_id = update.effective_user.id
-    
-    if await check_and_handle_mandatory_subs(update, context):
-        return
-    
-    # Foydalanuvchi qancha odam qo'shgan
-    count = await get_user_referral_count(user_id)
-    
-    refer_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
-    
-    text = (
-        f"🔗 <b>Sizning referal havolangiz:</b>\n"
-        f"<code>{refer_link}</code>\n\n"
-        f"👥 <b>Umumiy qo'shgan odamlaringiz:</b> {count} ta\n\n"
-        f"<i>Havolani do'stlaringizga yuboring va botga qo'shilingan har bir do'stingiz hisoblanadi!</i>"
-    )
-    
-    await update.message.reply_text(
-        text,
-        parse_mode="HTML",
-        disable_web_page_preview=True
-    )
-
-
 # ======================== Admin panel ========================
 async def admin(update: Update, context: CallbackContext):
     if update.effective_user.id != ADMIN_ID:
@@ -368,7 +338,6 @@ async def admin(update: Update, context: CallbackContext):
         "/broadcast - obunachilarga xabar\n"
         "/createref - referal havola yaratish\n"
         "/refstats - referallar statistikasi\n"
-        "/userref &lt;user_id&gt; - foydalanuvchi referallari\n"
         "/setad - reklama o'rnatish\n"
         "/removead - reklamani o'chirish\n"
         "/adstats - reklama statistikasi\n\n"
@@ -388,39 +357,6 @@ async def admin(update: Update, context: CallbackContext):
         "/add_mandatory bot @kinobot 3000\n\n"
         "/remove_mandatory &lt;id&gt; - o'chirish\n"
         "/list_mandatory - ro'yxat",
-        parse_mode="HTML",
-        disable_web_page_preview=True
-    )
-
-
-# ======================== Foydalanuvchi referallarini ko'rish (admin) ========================
-async def userref(update: Update, context: CallbackContext):
-    """Admin foydalanuvchining referallarini ko'radi"""
-    if update.effective_user.id != ADMIN_ID:
-        return
-    
-    if not context.args:
-        await update.message.reply_text("📛 Foydalanuvchi ID sini kiriting: /userref 123456789")
-        return
-    
-    try:
-        target_user_id = int(context.args[0])
-    except ValueError:
-        await update.message.reply_text("❌ Noto'g'ri ID formati.")
-        return
-    
-    count = await get_user_referral_count(target_user_id)
-    
-    refer_link = f"https://t.me/{BOT_USERNAME}?start={target_user_id}"
-    
-    text = (
-        f"🔗 <b>Foydalanuvchi {target_user_id} referal havolasi:</b>\n"
-        f"<code>{refer_link}</code>\n\n"
-        f"👥 <b>Umumiy qo'shgan odamlari:</b> {count} ta"
-    )
-    
-    await update.message.reply_text(
-        text,
         parse_mode="HTML",
         disable_web_page_preview=True
     )
@@ -587,11 +523,9 @@ async def createref_get_name(update: Update, context: CallbackContext):
         if not await check_referral_code(code):
             break
     await create_referral(name, code)
-    link = f"https://t.me/{BOT_USERNAME}?start={code}"
     await update.message.reply_text(
         f"✅ Yangi referal havola yaratildi\n\n"
         f"📌 Nomi: {name}\n"
-        f"🔗 Havola: {link}\n"
         f"🆔 Kod: {code}"
     )
     return ConversationHandler.END
@@ -769,9 +703,6 @@ async def handle_code(update: Update, context: CallbackContext):
             print(f"Video yuborish xatosi: {e}")
             await update.message.reply_text("❌ Video yuborishda xatolik yuz berdi.")
             return
-        links_msg = (
-        )
-        await update.message.reply_text(links_msg)
         await send_ad(context.bot, user_id)
     else:
         await update.message.reply_text(f"❌ {text} kodli video topilmadi.")
@@ -806,8 +737,6 @@ async def main():
     bot_application.add_handler(CommandHandler("delvideo", delvideo, filters=private_filter))
     bot_application.add_handler(CommandHandler("list", listvideos, filters=private_filter))
     bot_application.add_handler(CommandHandler("refstats", refstats, filters=private_filter))
-    bot_application.add_handler(CommandHandler("referral", referral, filters=private_filter))
-    bot_application.add_handler(CommandHandler("userref", userref, filters=private_filter))
     bot_application.add_handler(CommandHandler("removead", removead, filters=private_filter))
     bot_application.add_handler(CommandHandler("adstats", adstats, filters=private_filter))
     bot_application.add_handler(CommandHandler("cancel", cancel, filters=private_filter))
